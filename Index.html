@@ -1,0 +1,1071 @@
+<!DOCTYPE html>  <html lang="ko">  
+<head>  
+    <meta charset="UTF-8">  
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">  
+    <title>다기능 랜덤 추첨 & 조 편성 시스템</title>  
+    <!-- Tailwind CSS CDN -->  
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>  
+    <!-- Font Awesome Icons -->  
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">  
+    <!-- Canvas Confetti (폭죽 효과용) -->  
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>  
+    <style>  
+        .glass {  
+            background: rgba(30, 41, 59, 0.7);  
+            backdrop-filter: blur(12px);  
+            border: 1px solid rgba(255, 255, 255, 0.05);  
+        }  
+        .card-flip {  
+            perspective: 1000px;  
+        }  
+        .card-inner {  
+            transition: transform 0.6s;  
+            transform-style: preserve-3d;  
+        }  
+        .card-flip.flipped .card-inner {  
+            transform: rotateY(180deg);  
+        }  
+        .card-front, .card-back {  
+            backface-visibility: hidden;  
+        }  
+        .card-back {  
+            transform: rotateY(180deg);  
+        }  
+        /* 스크롤바 커스텀 */  
+        ::-webkit-scrollbar {  
+            width: 6px;  
+            height: 6px;  
+        }  
+        ::-webkit-scrollbar-track {  
+            background: rgba(15, 23, 42, 0.5);  
+        }  
+        ::-webkit-scrollbar-thumb {  
+            background: rgba(99, 102, 241, 0.5);  
+            border-radius: 3px;  
+        }  
+    </style>  
+</head>  
+<body class="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 text-slate-100 min-h-screen font-sans antialiased">  <!-- 네비게이션 바 -->  
+<nav class="sticky top-0 z-50 glass border-b border-slate-800 px-4 py-3 flex justify-between items-center shadow-lg">  
+    <div class="flex items-center gap-2 cursor-pointer" onclick="goHome()">  
+        <i class="fa-solid solid fa-dice text-indigo-500 text-2xl animate-spin-slow"></i>  
+        <span class="font-extrabold text-xl tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-cyan-400">PICKER MASTER</span>  
+    </div>  
+    <div class="text-sm font-semibold text-slate-400 bg-slate-900/80 px-3 py-1.5 rounded-full border border-slate-800">  
+        등록 멤버: <span id="nav-count" class="text-indigo-400 font-bold">0</span>명  
+    </div>  
+</nav>  
+
+<!-- 메인 컨테이너 -->  
+<main class="max-w-7xl mx-auto px-4 py-6 md:py-10">  
+
+    <!-- ================= [ PAGE 1: 멤버 관리 홈 ] ================= -->  
+    <section id="page-home" class="space-y-8">  
+        <!-- 헤더 타이틀 -->  
+        <div class="text-center space-y-2">  
+            <h1 class="text-3xl md:text-5xl font-black tracking-tight text-white">랜덤 추첨 & 조 편성</h1>  
+            <p class="text-slate-400 text-sm md:text-base">멤버를 등록하고 조 편성, 미니게임, 자리 배치를 자유롭게 즐겨보세요!</p>  
+        </div>  
+
+        <!-- 대시보드 그리드 -->  
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">  
+            <!-- 왼쪽: 멤버 입력 폼 -->  
+            <div class="glass rounded-2xl p-6 shadow-xl space-y-5 flex flex-col justify-between">  
+                <div>  
+                    <div class="flex justify-between items-center mb-4">  
+                        <h2 class="text-lg font-bold flex items-center gap-2 text-indigo-400">  
+                            <i class="fa-solid fa-user-plus"></i> 멤버 직접 등록  
+                        </h2>  
+                        <button onclick="loadSampleData()" class="text-xs bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">  
+                            <i class="fa-solid fa-users-viewfinder"></i> 샘플 12명 불러오기  
+                        </button>  
+                    </div>  
+                      
+                    <div class="space-y-4">  
+                        <!-- 이름 -->  
+                        <div>  
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">이름 *</label>  
+                            <input type="text" id="input-name" placeholder="이름을 입력하세요" class="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">  
+                        </div>  
+                        <!-- 이미지 파일 업로드 -->  
+                        <div>  
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">멤버 사진</label>  
+                            <div class="relative w-full h-10 bg-slate-900/80 border border-slate-700 rounded-xl flex items-center px-3 cursor-pointer hover:border-slate-500 transition">  
+                                <input type="file" id="input-image" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer" onchange="handleImageSelect(this)">  
+                                <i class="fa-solid fa-image text-slate-500 mr-2"></i>  
+                                <span id="image-filename" class="text-sm text-slate-400 truncate">이미지 파일 선택 (미선택시 기본)</span>  
+                            </div>  
+                        </div>  
+                        <!-- 티어 설정 -->  
+                        <div>  
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">등급 (티어)</label>  
+                            <select id="input-tier" class="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 transition">  
+                                <option value="none">티어 없음</option>  
+                                <option value="1">1티어</option>  
+                                <option value="2">2티어</option>  
+                                <option value="3">3티어</option>  
+                                <option value="4">4티어</option>  
+                                <option value="5">5티어</option>  
+                                <option value="S">S티어 (빨강)</option>  
+                                <option value="A">A티어 (청록)</option>  
+                                <option value="B">B티어 (파랑)</option>  
+                                <option value="C">C티어 (노랑)</option>  
+                                <option value="D">D티어 (연두)</option>  
+                            </select>  
+                        </div>  
+                        <!-- 포지션 설정 -->  
+                        <div>  
+                            <label class="block text-xs font-semibold text-slate-400 mb-1">포지션</label>  
+                            <select id="input-position" class="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 transition">  
+                                <option value="none">포지션 없음</option>  
+                                <option value="탱커">🛡️ 탱크 (탱커)</option>  
+                                <option value="전사">⚔️ 전사 (브루저)</option>  
+                                <option value="마법사">🔮 마법사 (메이지)</option>  
+                                <option value="암살자">🗡️ 암살자 (어쌔신)</option>  
+                                <option value="원거리">🏹 원거리 (딜러)</option>  
+                                <option value="서포터">🧪 서포터 (힐러)</option>  
+                            </select>  
+                        </div>  
+                    </div>  
+                </div>  
+
+                <button onclick="addMember()" class="w-full mt-6 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center justify-center gap-2">  
+                    <i class="fa-solid fa-plus"></i> 멤버 추가하기  
+                </button>  
+            </div>  
+
+            <!-- 오른쪽: 등록된 멤버 리스트 현황 -->  
+            <div class="glass rounded-2xl p-6 shadow-xl lg:col-span-2 flex flex-col justify-between">  
+                <div>  
+                    <div class="flex justify-between items-center mb-4">  
+                        <h2 class="text-lg font-bold flex items-center gap-2 text-emerald-400">  
+                            <i class="fa-solid fa-users"></i> 등록된 멤버 목록   
+                        </h2>  
+                        <button onclick="clearAllMembers()" class="text-xs bg-slate-800 hover:bg-red-950 text-red-400 border border-red-900/50 px-3 py-1.5 rounded-lg font-semibold transition flex items-center gap-1">  
+                            <i class="fa-solid fa-trash-can"></i> 전체 삭제  
+                        </button>  
+                    </div>  
+
+                    <!-- 멤버 리스트 컨테이너 -->  
+                    <div id="member-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-[380px] overflow-y-auto pr-2">  
+                        <!-- 멤버 카드가 동적으로 주입됨 -->  
+                        <div id="empty-notice" class="col-span-full py-12 text-center text-slate-500 space-y-2">  
+                            <i class="fa-solid fa-users-slash text-4xl block opacity-40"></i>  
+                            <p class="text-sm">등록된 멤버가 없습니다. 샘플 데이터를 불러오거나 직접 추가해보세요!</p>  
+                        </div>  
+                    </div>  
+                </div>  
+
+                <!-- 기능 선택 구역 (최소 1명 이상 필요) -->  
+                <div class="mt-6 border-t border-slate-800 pt-4 grid grid-cols-1 md:grid-cols-3 gap-3">  
+                    <button onclick="openFeatureConfig('team')" class="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 p-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition shadow-lg">  
+                        <i class="fa-solid fa-people-group text-lg"></i>  
+                        <span class="text-sm">랜덤 조 편성</span>  
+                    </button>  
+                    <button onclick="openFeatureConfig('game')" class="bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 p-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition shadow-lg">  
+                        <i class="fa-solid fa-gamepad text-lg"></i>  
+                        <span class="text-sm">랜덤 미니게임</span>  
+                    </button>  
+                    <button onclick="openFeatureConfig('seat')" class="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 p-3 rounded-xl font-bold flex flex-col items-center justify-center gap-1 transition shadow-lg">  
+                        <i class="fa-solid fa-chair text-lg"></i>  
+                        <span class="text-sm">학교 / 버스 자리 배치</span>  
+                    </button>  
+                </div>  
+            </div>  
+        </div>  
+    </section>  
+
+
+    <!-- ================= [ PAGE 2: 세부 기능 설정창 ] ================= -->  
+    <section id="page-config" class="hidden glass rounded-3xl p-6 md:p-8 max-w-2xl mx-auto shadow-2xl space-y-6">  
+        <div class="flex items-center gap-3 border-b border-slate-800 pb-4">  
+            <button onclick="goHome()" class="w-9 h-9 bg-slate-800 hover:bg-slate-700 rounded-xl flex items-center justify-center transition">  
+                <i class="fa-solid fa-arrow-left"></i>  
+            </button>  
+            <h2 id="config-title" class="text-xl md:text-2xl font-black text-white">기능 설정</h2>  
+        </div>  
+
+        <!-- ① 조 편성 설정 그룹 -->  
+        <div id="config-group-team" class="hidden space-y-5">  
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">  
+                <div>  
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5">분할 기준</label>  
+                    <select id="team-split-type" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5">  
+                        <option value="number">숫자 이름 (1조, 2조...)</option>  
+                        <option value="alphabet">알파벳 이름 (A조, B조...)</option>  
+                    </select>  
+                </div>  
+                <div>  
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5">조 개수 설정</label>  
+                    <input type="number" id="team-count" value="2" min="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">  
+                </div>  
+            </div>  
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">  
+                <div>  
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5">추첨 방식</label>  
+                    <select id="team-draw-method" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5">  
+                        <option value="instant">한번에 전체 뽑기 (즉시 출력)</option>  
+                        <option value="sequence">하나씩 순차적으로 뽑기 (애니메이션)</option>  
+                    </select>  
+                </div>  
+                <div>  
+                    <label class="block text-xs font-bold text-slate-400 mb-1.5">조 목적 (테마 디자인)</label>  
+                    <select id="team-theme" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5">  
+                        <option value="mission">🎯 미션 수행 조</option>  
+                        <option value="battle">⚔️ 전투(싸움) 조</option>  
+                        <option value="normal">👥 일반 모둠 조</option>  
+                        <option value="seat">🪑 자리 배치 조</option>  
+                    </select>  
+                </div>  
+            </div>  
+            <!-- 밸런스 매칭 알고리즘 토글 -->  
+            <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-2">  
+                <div class="flex justify-between items-center">  
+                    <div>  
+                        <span class="text-sm font-bold text-indigo-400 block">밸런스 균등 편성 알고리즘 활성화</span>  
+                        <span class="text-xs text-slate-400 block mt-0.5">활성화 시 선택된 티어 및 포지션이 최대한 고르게 분배되도록 매칭합니다. (미선택자는 무작위 배치)</span>  
+                    </div>  
+                    <label class="relative inline-flex items-center cursor-pointer">  
+                        <input type="checkbox" id="team-balance-toggle" class="sr-only peer">  
+                        <div class="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>  
+                    </label>  
+                </div>  
+            </div>  
+            <button onclick="startTeamGeneration()" class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 rounded-xl font-bold text-white shadow-lg shadow-indigo-900/30">조 편성 시작하기</button>  
+        </div>  
+
+        <!-- ② 미니게임 설정 그룹 -->  
+        <div id="config-group-game" class="hidden space-y-4">  
+            <label class="block text-xs font-bold text-slate-400 mb-1">원하는 미니게임을 선택해봐!</label>  
+            <div class="grid grid-cols-2 gap-3">  
+                <button onclick="startMiniGame('roulette')" class="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl flex flex-col items-center gap-2 transition group text-center">  
+                    <i class="fa-solid fa-circle-dot text-2xl text-rose-500 group-hover:scale-110 transition"></i>  
+                    <span class="font-bold text-sm">돌려돌려 돌림판</span>  
+                </button>  
+                <button onclick="startMiniGame('cannon')" class="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl flex flex-col items-center gap-2 transition group text-center">  
+                    <i class="fa-solid fa-bomb text-2xl text-yellow-500 group-hover:scale-110 transition"></i>  
+                    <span class="font-bold text-sm">대포 뽑기</span>  
+                </button>  
+                <button onclick="startMiniGame('draw')" class="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl flex flex-col items-center gap-2 transition group text-center">  
+                    <i class="fa-solid fa-clone text-2xl text-cyan-500 group-hover:scale-110 transition"></i>  
+                    <span class="font-bold text-sm">제비뽑기 (카드 뒤집기)</span>  
+                </button>  
+                <button onclick="startMiniGame('order')" class="p-4 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl flex flex-col items-center gap-2 transition group text-center">  
+                    <i class="fa-solid fa-list-ol text-2xl text-emerald-500 group-hover:scale-110 transition"></i>  
+                    <span class="font-bold text-sm">순서 뽑기</span>  
+                </button>  
+            </div>  
+        </div>  
+
+        <!-- ③ 자리 배치 설정 그룹 -->  
+        <div id="config-group-seat" class="hidden space-y-4">  
+            <label class="block text-xs font-bold text-slate-400 mb-1">배치 유형 선택</label>  
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">  
+                <button onclick="startSeatArrangement('school')" class="p-5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-2xl flex flex-col items-center gap-3 transition group text-center">  
+                    <i class="fa-solid fa-school text-3xl text-amber-500 group-hover:scale-110 transition"></i>  
+                    <div>  
+                        <span class="font-bold block text-base text-white">학교 교실 배치</span>  
+                        <span class="text-xs text-slate-400 mt-1 block">[2열] - (복도) - [2열] - (복도) - [2열]</span>  
+                    </div>  
+                </button>  
+                <button onclick="startSeatArrangement('bus')" class="p-5 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-2xl flex flex-col items-center gap-3 transition group text-center">  
+                    <i class="fa-solid fa-bus text-3xl text-indigo-500 group-hover:scale-110 transition"></i>  
+                    <div>  
+                        <span class="font-bold block text-base text-white">고속 버스 배치</span>  
+                        <span class="text-xs text-slate-400 mt-1 block">[2열] - (통로) - [2열] 구조</span>  
+                    </div>  
+                </button>  
+            </div>  
+        </div>  
+    </section>  
+
+
+    <!-- ================= [ PAGE 3: 결과 화면 및 미니게임 구역 ] ================= -->  
+    <section id="page-result" class="hidden space-y-6">  
+        <!-- 공통 리셋/컨트롤 상단 바 -->  
+        <div class="flex justify-between items-center glass p-4 rounded-xl shadow-lg">  
+            <span id="result-type-badge" class="px-3 py-1 bg-indigo-600/30 border border-indigo-500/50 text-indigo-300 font-bold text-xs rounded-full">RESULT</span>  
+            <button onclick="goHome()" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition flex items-center gap-1">  
+                <i class="fa-solid fa-rotate-left"></i> 처음으로 돌아가기  
+            </button>  
+        </div>  
+
+        <!-- 결과 콘텐츠 동적 마운트 구역 -->  
+        <div id="result-display-area" class="w-full">  
+            <!-- 여기에 각종 게임 결과 템플릿 돔들이 코드로 밀고 들어옵니다. -->  
+        </div>  
+    </section>  
+
+</main>  
+
+<!-- 글로벌 자바스크립트 스크립트 -->  
+<script>  
+    // 글로벌 상태 관리 객체  
+    let members = [];  
+    let selectedFileBase64 = "";  
+
+// 샘플 아바타 플레이스홀더 제너레이터 (게임 스타일 아이콘으로 변경)
+    const sampleAvatars = [
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Felix",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Annie",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Midnight",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=King",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Shadow",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Luna",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Ace",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Dragon",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Spark",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Nova",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Ghost",
+        "https://api.dicebear.com/9.x/pixel-art/svg?seed=Viper"
+    ];
+
+    
+    
+    // 뷰 전환 컨트롤러  
+    function showPage(pageId) {  
+        document.getElementById('page-home').classList.add('hidden');  
+        document.getElementById('page-config').classList.add('hidden');  
+        document.getElementById('page-result').classList.add('hidden');  
+        document.getElementById(pageId).classList.remove('hidden');  
+        window.scrollTo({ top: 0, behavior: 'smooth' });  
+    }  
+
+    function goHome() {  
+        showPage('page-home');  
+    }  
+
+    // 이미지 파일 이벤트 리스너 처리  
+    function handleImageSelect(input) {  
+        if (input.files && input.files[0]) {  
+            const file = input.files[0];  
+            document.getElementById('image-filename').innerText = file.name;  
+            const reader = new FileReader();  
+            reader.onload = function(e) {  
+                selectedFileBase64 = e.target.result;  
+            };  
+            reader.readAsDataURL(file);  
+        }  
+    }  
+
+    // 멤버 카드 렌더링 헬퍼 함수  
+    function renderMembers() {  
+        const grid = document.getElementById('member-grid');  
+        const emptyNotice = document.getElementById('empty-notice');  
+        const countNav = document.getElementById('nav-count');  
+          
+        // 기존 노드들 청소 (Notice 제외)  
+        const cards = grid.querySelectorAll('.member-card-item');  
+        cards.forEach(card => card.remove());  
+
+        countNav.innerText = members.length;  
+
+        if (members.length === 0) {  
+            emptyNotice.classList.remove('hidden');  
+            return;  
+        } else {  
+            emptyNotice.classList.add('hidden');  
+        }  
+
+        members.forEach((m, idx) => {  
+            const card = document.createElement('div');  
+            card.className = "member-card-item bg-slate-900/90 rounded-xl overflow-hidden border p-2 flex flex-col justify-between items-center shadow-md relative group transition hover:-translate-y-1 duration-200";  
+              
+            // 티어 스타일 바인딩  
+            let tierBorderColor = "border-slate-800";  
+            let tierBadge = "";  
+            if (m.tier !== 'none') {  
+                if (m.tier === 'S') tierBorderColor = "border-[#EF4444] border-2";  
+                else if (m.tier === 'A') tierBorderColor = "border-[#06B6D4] border-2";  
+                else if (m.tier === 'B') tierBorderColor = "border-[#3B82F6] border-2";  
+                else if (m.tier === 'C') tierBorderColor = "border-[#EAB308] border-2";  
+                else if (m.tier === 'D') tierBorderColor = "border-[#22C55E] border-2";  
+                else tierBorderColor = "border-slate-700"; // 숫자티어  
+
+                tierBadge = `<span class="absolute top-1 left-1 z-10 text-[10px] bg-slate-950/80 px-1.5 py-0.5 rounded font-black text-slate-200 border border-slate-700">${m.tier}티어</span>`;  
+            }  
+            card.className += ` ${tierBorderColor}`;  
+
+            // 포지션 배지 바인딩  
+            const posBadge = m.position !== 'none' ? `<span class="absolute top-1 right-1 z-10 text-[10px] bg-indigo-950/90 px-1.5 py-0.5 rounded-full font-semibold text-indigo-300 border border-indigo-800/60">${m.position}</span>` : '';  
+
+            card.innerHTML = `  
+                ${tierBadge}  
+                ${posBadge}  
+                <div class="w-full aspect-square overflow-hidden rounded-lg bg-slate-800 mb-2 relative">  
+                    <img src="${m.image}" alt="${m.name}" class="w-full h-full object-cover">  
+                </div>  
+                <div class="text-center w-full">  
+                    <p class="font-bold text-sm truncate text-white">${m.name}</p>  
+                </div>  
+                <button onclick="deleteMember(${m.id})" class="absolute inset-0 bg-red-600/90 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white font-bold text-sm rounded-xl transition duration-200 cursor-pointer">  
+                    <i class="fa-solid fa-trash-can mr-1"></i> 삭제  
+                </button>  
+            `;  
+            grid.appendChild(card);  
+        });  
+    }  
+
+    // 멤버 추가 기능  
+    function addMember() {  
+        const nameInput = document.getElementById('input-name');  
+        const tierInput = document.getElementById('input-tier');  
+        const posInput = document.getElementById('input-position');  
+
+        if (!nameInput.value.trim()) {  
+            alert("멤버 이름을 정확히 입력해줘!");  
+            return;  
+        }  
+
+        const defaultImg = "https://api.dicebear.com
+/9.x/pixel-art/svg?seed=Felix";  
+        const finalImage = selectedFileBase64 ? selectedFileBase64 : defaultImg;  
+
+        const newMember = {  
+            id: Date.now() + Math.random(),  
+            name: nameInput.value.trim(),  
+            image: finalImage,  
+            tier: tierInput.value,  
+            position: posInput.value  
+        };  
+
+        members.push(newMember);  
+          
+        // 입력창 리셋  
+        nameInput.value = "";  
+        document.getElementById('input-image').value = "";  
+        document.getElementById('image-filename').innerText = "이미지 파일 선택 (미선택시 기본)";  
+        selectedFileBase64 = "";  
+
+        renderMembers();  
+    }  
+
+    // 개별 멤버 삭제  
+    function deleteMember(id) {  
+        members = members.filter(m => m.id !== id);  
+        renderMembers();  
+    }  
+
+    // 전체 삭제  
+    function clearAllMembers() {  
+        if (confirm("정말 등록된 모든 멤버를 삭제할래?")) {  
+            members = [];  
+            renderMembers();  
+        }  
+    }  
+
+// 한국인 샘플 데이터 로드 기능
+    function loadSampleData() {
+        const sampleNames = ["페이커지망생", "심해탈출러", "한타장인", "버그왕", "트롤감지기", "킬캐치전문가", "논타겟장인", "탑신병자", "서폿차이", "골드무시", "펜타킬러", "전략가"];
+        const tiers = ["1", "2", "3", "4", "5", "S", "A", "B", "C", "D", "none"];
+        const positions = ["탱커", "전사", "마법사", "암살자", "원거리", "서포터", "none"];
+
+        sampleNames.forEach((name, i) => {
+            const randomTier = tiers[Math.floor(Math.random() * tiers.length)];
+            const randomPos = positions[Math.floor(Math.random() * positions.length)];
+            
+            members.push({
+                id: Date.now() + i + Math.random(),
+                name: name,
+                image: sampleAvatars[i % sampleAvatars.length],
+                tier: randomTier,
+                position: randomPos
+            });
+        });
+
+        renderMembers();
+    }
+
+   
+
+    // 기능 세부 설정 오픈 라우터  
+    function openFeatureConfig(type) {  
+        if (members.length === 0) {  
+            alert("먼저 최소 1명 이상의 멤버를 등록해줘!");  
+            return;  
+        }  
+
+        showPage('page-config');  
+        document.getElementById('config-group-team').classList.add('hidden');  
+        document.getElementById('config-group-game').classList.add('hidden');  
+        document.getElementById('config-group-seat').classList.add('hidden');  
+
+        const title = document.getElementById('config-title');  
+
+        if (type === 'team') {  
+            title.innerText = "랜덤 조 편성 설정";  
+            document.getElementById('config-group-team').classList.remove('hidden');  
+        } else if (type === 'game') {  
+            title.innerText = "랜덤 게임 & 단일 추첨";  
+            document.getElementById('config-group-game').classList.remove('hidden');  
+        } else if (type === 'seat') {  
+            title.innerText = "자리 배치 시스템 설정";  
+            document.getElementById('config-group-seat').classList.remove('hidden');  
+        }  
+    }  
+
+
+    /* ====================================================================  
+       ① 랜덤 조 편성 (팀 빌딩) 핵심 엔진 & UI 알고리즘 구현  
+       ==================================================================== */  
+    function startTeamGeneration() {  
+        const splitType = document.getElementById('team-split-type').value;  
+        const teamCount = parseInt(document.getElementById('team-count').value);  
+        const drawMethod = document.getElementById('team-draw-method').value;  
+        const theme = document.getElementById('team-theme').value;  
+        const balanceActive = document.getElementById('team-balance-toggle').checked;  
+
+        if (isNaN(teamCount) || teamCount < 2) {  
+            alert("조 개수는 최소 2개 이상으로 입력해줘!");  
+            return;  
+        }  
+
+        // 결과 화면 준비  
+        showPage('page-result');  
+        document.getElementById('result-type-badge').innerText = "TEAM MATCHING";  
+        const area = document.getElementById('result-display-area');  
+
+        // 테마 스타일에 따른 디자인 프리셋 정의  
+        let themeTitle = "조 편성 결과";  
+        let themeBg = "from-slate-900 to-slate-950";  
+        if (theme === 'mission') { themeTitle = "🎯 미션 수행 프로젝트 팀"; themeBg = "from-cyan-950 via-slate-900 to-slate-950"; }  
+        else if (theme === 'battle') { themeTitle = "⚔️ 결전! 데스매치 배틀 조"; themeBg = "from-rose-950 via-slate-900 to-slate-950"; }  
+        else if (theme === 'normal') { themeTitle = "👥 스터디 협동 모둠 조"; themeBg = "from-indigo-950 via-slate-900 to-slate-950"; }  
+        else if (theme === 'seat') { themeTitle = "🪑 공간 배치 & 협력 위원회"; themeBg = "from-emerald-950 via-slate-900 to-slate-950"; }  
+
+        // 조 배열 초기화  
+        let teams = [];  
+        for (let i = 0; i < teamCount; i++) {  
+            let name = (splitType === 'number') ? `${i + 1}조` : `${String.fromCharCode(65 + i)}조`;  
+            teams.push({ name: name, members: [] });  
+        }  
+
+        // 멤버 셔플 복사본 제작  
+        let pool = [...members];  
+        // 완전 랜덤 셔플 함수  
+        const shuffleArray = (arr) => arr.sort(() => Math.random() - 0.5);  
+
+        if (balanceActive) {  
+            // [밸런스 매칭 균등 분배 라운드 로빈 기법 알고리즘]  
+            // 1. 티어 등급 점수 스케일링 가중치 환산 점수 부여  
+            const getTierScore = (t) => {  
+                if (t === 'S') return 10;  
+                if (t === 'A') return 8;  
+                if (t === 'B') return 6;  
+                if (t === 'C') return 4;  
+                if (t === 'D') return 2;  
+                if (t === '1') return 5;  
+                if (t === '2') return 4;  
+                if (t === '3') return 3;  
+                if (t === '4') return 2;  
+                if (t === '5') return 1;  
+                return 0; // 없음  
+            };  
+
+            // 점수가 높은 순으로 정렬 후, 동일 점수 내에서 무작위 셔플  
+            pool.sort((a, b) => getTierScore(b.tier) - getTierScore(a.tier));  
+              
+            // 라운드 로빈식 균등 적재 (뱀 모양 지그재그 분배로 역방향 밸런싱까지 고정)  
+            let reverse = false;  
+            let teamIdx = 0;  
+              
+            pool.forEach(member => {  
+                teams[teamIdx].members.push(member);  
+                if (!reverse) {  
+                    teamIdx++;  
+                    if (teamIdx >= teamCount) { teamIdx = teamCount - 1; reverse = true; }  
+                } else {  
+                    teamIdx--;  
+                    if (teamIdx < 0) { teamIdx = 0; reverse = false; }  
+                }  
+            });  
+            // 균형 분배 완료 후 가독성을 위해 팀 리스트 순차 무작위 셔플  
+            teams.forEach(t => shuffleArray(t.members));  
+        } else {  
+            // 순수 일반 완전 무작위 드로우 처리  
+            shuffleArray(pool);  
+            pool.forEach((member, index) => {  
+                teams[index % teamCount].members.push(member);  
+            });  
+        }  
+
+        // UI 뼈대 구조 생성  
+        area.innerHTML = `  
+            <div class="bg-gradient-to-b ${themeBg} rounded-3xl p-6 md:p-8 border border-slate-800 shadow-2xl space-y-6">  
+                <div class="text-center">  
+                    <h2 class="text-2xl md:text-4xl font-extrabold text-white tracking-wide">${themeTitle}</h2>  
+                    <p class="text-xs text-slate-400 mt-1">${balanceActive ? '⚠️ 밸런스 균등 보정 알고리즘이 가동되었습니다.' : '🎲 순수 무작위 편성이 완료되었습니다.'}</p>  
+                </div>  
+                <div id="teams-box-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>  
+            </div>  
+        `;  
+
+        const boxGrid = document.getElementById('teams-box-grid');  
+
+        if (drawMethod === 'instant') {  
+            // ① 즉시 출력 모드  
+            teams.forEach(t => {  
+                boxGrid.appendChild(createTeamCardDOM(t));  
+            });  
+            confetti({ particleCount: 150, spread: 80 });  
+        } else {  
+            // ② 순차적 애니메이션 등장 모드  
+            let currentTeamIdx = 0;  
+              
+            // 가상 컨테이너 우선 뼈대 구성  
+            teams.forEach((t, idx) => {  
+                const placeholder = document.createElement('div');  
+                placeholder.id = `animate-team-box-${idx}`;  
+                placeholder.className = "glass p-5 rounded-2xl border border-dashed border-slate-700 flex flex-col items-center justify-center min-h-[150px] text-slate-500 font-bold text-sm";  
+                placeholder.innerHTML = `<i class="fa-solid fa-spinner animate-spin mb-2 text-indigo-400 text-lg"></i> ${t.name} 소정 편성 중...`;  
+                boxGrid.appendChild(placeholder);  
+            });  
+
+            function revealNextTeam() {  
+                if (currentTeamIdx >= teams.length) {  
+                    confetti({ particleCount: 100, spread: 60 });  
+                    return;  
+                }  
+                setTimeout(() => {  
+                    const placeholder = document.getElementById(`animate-team-box-${currentTeamIdx}`);  
+                    if (placeholder) {  
+                        const realCard = createTeamCardDOM(teams[currentTeamIdx]);  
+                        realCard.classList.add('animate-bounce-short');  
+                        placeholder.replaceWith(realCard);  
+                    }  
+                    currentTeamIdx++;  
+                    revealNextTeam();  
+                }, 1000);  
+            }  
+            revealNextTeam();  
+        }  
+    }  
+
+    // 개별 팀 카드를 구성하는 헬퍼 DOM 빌더  
+    function createTeamCardDOM(team) {  
+        const box = document.createElement('div');  
+        box.className = "glass p-5 rounded-2xl border border-slate-800/80 flex flex-col justify-between space-y-4 shadow-xl";  
+          
+        let membersListHTML = team.members.map(m => {  
+            let tBadge = m.tier !== 'none' ? `<span class="text-[10px] bg-slate-950 px-1 rounded text-slate-400 font-black">${m.tier}</span>` : '';  
+            return `  
+                <div class="flex items-center gap-3 bg-slate-950/40 p-2 rounded-xl border border-slate-900">  
+                    <img src="${m.image}" class="w-10 h-10 rounded-lg object-cover bg-slate-800" alt="">  
+                    <div class="flex-1 min-w-0">  
+                        <p class="text-sm font-bold text-white truncate">${m.name}</p>  
+                        <p class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">${tBadge} ${m.position !== 'none' ? m.position : ''}</p>  
+                    </div>  
+                </div>  
+            `;  
+        }).join('');  
+
+        if(team.members.length === 0) {  
+            membersListHTML = `<p class="text-xs text-slate-500 text-center py-4">배정된 인원이 없습니다.</p>`;  
+        }  
+
+        box.innerHTML = `  
+            <div>  
+                <h3 class="text-lg font-black text-indigo-400 border-b border-slate-800 pb-2 flex justify-between items-center">  
+                    <span><i class="fa-solid fa-people-group text-slate-500 mr-1.5"></i>${team.name}</span>  
+                    <span class="text-xs font-medium text-slate-400">인원: ${team.members.length}명</span>  
+                </h3>  
+                <div class="space-y-2 mt-3 max-h-[300px] overflow-y-auto pr-1">  
+                    ${membersListHTML}  
+                </div>  
+            </div>  
+        `;  
+        return box;  
+    }  
+
+
+    /* ====================================================================  
+       ② 랜덤 게임 및 단일 추첨 (미니게임 4종 시스템 가동 엔진)  
+       ==================================================================== */  
+    function startMiniGame(gameType) {  
+        showPage('page-result');  
+        document.getElementById('result-type-badge').innerText = `MINI GAME: ${gameType.toUpperCase()}`;  
+        const area = document.getElementById('result-display-area');  
+
+        if (gameType === 'roulette') {  
+            // 1. 돌려돌려 돌림판 (HTML5 Canvas 정밀 기하학 드로잉 회전 연출)  
+            area.innerHTML = `  
+                <div class="glass max-w-lg mx-auto rounded-3xl p-6 border border-slate-800 shadow-2xl flex flex-col items-center space-y-6">  
+                    <h2 class="text-2xl font-black text-white flex items-center gap-2"><i class="fa-solid fa-circle-dot text-rose-500"></i> 돌려돌려 돌림판</h2>  
+                    <div class="relative w-full aspect-square max-w-[360px]">  
+                        <!-- 마커 화살표 -->  
+                        <div class="absolute -top-3 left-1/2 -translate-x-1/2 z-20 text-yellow-400 text-3xl filter drop-shadow"><i class="fa-solid fa-caret-down"></i></div>  
+                        <canvas id="roulette-canvas" width="360" height="360" class="w-full h-full rounded-full border-4 border-slate-800 shadow-2xl bg-slate-900"></canvas>  
+                    </div>  
+                    <button id="btn-spin" onclick="spinRouletteWheel()" class="w-full bg-gradient-to-r from-rose-600 to-pink-600 font-bold py-3.5 rounded-xl shadow-lg text-white">원판 돌리기 (START)</button>  
+                    <div id="roulette-winner-box" class="hidden text-center p-4 bg-slate-950 rounded-xl border border-slate-800 w-full animate-bounce-short">  
+                        <p class="text-xs text-slate-400">🎉 당첨 축하드립니다 🎉</p>  
+                        <h3 id="roulette-winner-text" class="text-2xl font-black text-cyan-400 mt-1"></h3>  
+                    </div>  
+                </div>  
+            `;  
+            initRouletteCanvas();  
+        }   
+        else if (gameType === 'cannon') {  
+            // 2. 대포 뽑기 (폭죽 폭발 대형 프레임 팝업 연출)  
+            area.innerHTML = `  
+                <div class="glass max-w-xl mx-auto rounded-3xl p-6 border border-slate-800 text-center space-y-6">  
+                    <h2 class="text-2xl font-black text-white"><i class="fa-solid fa-bomb text-yellow-500"></i> 대포 조준 및 발사!</h2>  
+                    <div class="py-8 flex justify-center relative items-center">  
+                        <i id="cannon-icon" class="fa-solid fa-cannon text-7xl text-slate-400 transition-transform duration-300"></i>  
+                        <div class="text-[75px] absolute" id="cannon-fire-effect">💣</div>  
+                    </div>  
+                    <button id="btn-cannon-fire" onclick="fireCannonEngine()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black py-3.5 rounded-xl shadow-xl transition">대포 발사 (FIRE!)</button>  
+                      
+                    <!-- 팝업 오버레이 당첨 존 -->  
+                    <div id="cannon-result-popup" class="hidden bg-slate-950 p-6 rounded-2xl border-2 border-yellow-500/50 max-w-xs mx-auto space-y-3 shadow-2xl">  
+                        <p class="text-xs text-yellow-400 tracking-widest font-bold">TARGET LOCKED</p>  
+                        <div class="w-32 h-32 mx-auto rounded-xl overflow-hidden border border-slate-700 bg-slate-800">  
+                            <img id="cannon-winner-img" src="" class="w-full h-full object-cover" alt="">  
+                        </div>  
+                        <h3 id="cannon-winner-name" class="text-xl font-black text-white"></h3>  
+                    </div>  
+                </div>  
+            `;  
+            document.getElementById('cannon-fire-effect').style.opacity = '0';  
+        }   
+        else if (gameType === 'draw') {  
+            // 3. 제비뽑기 (럭키 카드 리얼 3D 3차원 플립 모션 카드 세트 구축)  
+            let shuffled = [...members].sort(() => Math.random() - 0.5);  
+            // 최대 가독성을 위해 16명 제한 조절 브레이킹  
+            let cardsHTML = shuffled.map((m, idx) => {  
+                return `  
+                    <div class="card-flip w-full aspect-[3/4] cursor-pointer" onclick="flipDrawCard(this, '${m.name}', '${m.image}')">  
+                        <div class="card-inner relative w-full h-full text-center rounded-xl shadow-lg border border-slate-800 duration-500">  
+                            <!-- 카드 앞면 (뒷모습 위장망) -->  
+                            <div class="card-front absolute inset-0 bg-gradient-to-br from-indigo-900 to-slate-900 rounded-xl flex flex-col items-center justify-center p-2 text-indigo-400 border border-indigo-700/30">  
+                                <i class="fa-solid fa-question-circle text-3xl mb-1 opacity-70"></i>  
+                                <span class="text-xs font-bold tracking-widest text-slate-400">PICK ME</span>  
+                            </div>  
+                            <!-- 카드 뒷면 (리얼 정체 공개면) -->  
+                            <div class="card-back absolute inset-0 bg-slate-950 rounded-xl flex flex-col items-center justify-between p-3 border border-emerald-500/50">  
+                                <div class="w-full aspect-square rounded-lg overflow-hidden bg-slate-800">  
+                                    <img src="${m.image}" class="w-full h-full object-cover" alt="">  
+                                </div>  
+                                <p class="text-sm font-bold text-emerald-400 truncate w-full mt-1">${m.name}</p>  
+                            </div>  
+                        </div>  
+                    </div>  
+                `;  
+            }).join('');  
+
+            area.innerHTML = `  
+                <div class="space-y-4">  
+                    <div class="text-center">  
+                        <h2 class="text-2xl font-black text-white"><i class="fa-solid fa-clone text-cyan-400"></i> 미스터리 럭키 제비뽑기</h2>  
+                        <p class="text-xs text-slate-400 mt-1">원하는 카드를 마우스로 클릭해서 뒤집어 당첨자를 직접 확인해봐!</p>  
+                    </div>  
+                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">  
+                        ${cardsHTML}  
+                    </div>  
+                </div>  
+            `;  
+        }   
+        else if (gameType === 'order') {  
+            // 4. 순서 뽑기 (시퀀스 대시보드 구조화 멀티 오프너)  
+            let orderList = [...members].sort(() => Math.random() - 0.5);  
+              
+            area.innerHTML = `  
+                <div class="glass max-w-2xl mx-auto rounded-3xl p-6 border border-slate-800 space-y-6">  
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-3">  
+                        <h2 class="text-xl font-bold text-white"><i class="fa-solid fa-list-ol text-emerald-400"></i> 전체 행동 / 발표 순서 라인업</h2>  
+                        <button onclick="revealAllOrderSequence()" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-bold">한번에 모두 공개</button>  
+                    </div>  
+                    <div id="order-sequence-container" class="space-y-2.5 max-h-[450px] overflow-y-auto pr-2"></div>  
+                </div>  
+            `;  
+
+            const container = document.getElementById('order-sequence-container');  
+            orderList.forEach((m, idx) => {  
+                const row = document.createElement('div');  
+                row.className = "order-row-item flex items-center justify-between p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 transition opacity-40 hover:opacity-100";  
+                row.innerHTML = `  
+                    <div class="flex items-center gap-4">  
+                        <span class="w-7 h-7 bg-slate-800 rounded-full flex items-center justify-center font-black text-sm text-indigo-400 border border-slate-700">${idx + 1}</span>  
+                        <div class="flex items-center gap-2.5 generic-hidden-mask blur-md transition duration-300">  
+                            <img src="${m.image}" class="w-8 h-8 rounded-md object-cover bg-slate-700">  
+                            <span class="font-bold text-sm text-white">${m.name}</span>  
+                        </div>  
+                    </div>  
+                    <button onclick="this.previousElementSibling.classList.remove('blur-md'); this.remove();" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1 rounded-md font-semibold">확인</button>  
+                `;  
+                container.appendChild(row);  
+            });  
+        }  
+    }  
+
+    // ================= 룰렛 상세 비즈니스 연출 로직 =================  
+    let rouletteLabels = [];  
+    let startAngle = 0;  
+    let arc = 0;  
+    let spinTimeout = null;  
+    let spinAngleStart = 10;  
+    let spinTime = 0;  
+    let spinTimeTotal = 0;  
+    let ctx = null;  
+
+    function initRouletteCanvas() {  
+        const canvas = document.getElementById("roulette-canvas");  
+        if (!canvas) return;  
+        ctx = canvas.getContext("2d");  
+        rouletteLabels = members.map(m => m.name);  
+        arc = Math.PI / (rouletteLabels.length / 2);  
+        drawRouletteWheel();  
+    }  
+
+    function drawRouletteWheel() {  
+        if (!ctx) return;  
+        const canvas = document.getElementById("roulette-canvas");  
+        ctx.clearRect(0, 0, canvas.width, canvas.height);  
+        const numOptions = rouletteLabels.length;  
+        const radius = 170;  
+        const outsideRadius = 170;  
+        const textRadius = 120;  
+        const insideRadius = 20;  
+
+        for (let i = 0; i < numOptions; i++) {  
+            const angle = startAngle + i * arc;  
+            // 세련된 사이키델릭 다크 배색 팔레트 그라데이션 자동 생성 유도  
+            ctx.fillStyle = (i % 2 === 0) ? '#1E1B4B' : '#312E81';  
+            if(numOptions % 2 !== 0 && i === numOptions - 1) ctx.fillStyle = '#4338CA'; // 홀수 예외 마감 처리  
+              
+            ctx.beginPath();  
+            ctx.arc(180, 180, outsideRadius, angle, angle + arc, false);  
+            ctx.arc(180, 180, insideRadius, angle + arc, angle, true);  
+            ctx.stroke();  
+            ctx.fill();  
+            ctx.save();  
+
+            // 텍스트 그리기 내부 변환 연출  
+            ctx.fillStyle = "#E2E8F0";  
+            ctx.font = "bold 13px sans-serif";  
+            ctx.translate(180 + Math.cos(angle + arc / 2) * textRadius, 180 + Math.sin(angle + arc / 2) * textRadius);  
+            ctx.rotate(angle + arc / 2 + Math.PI / 2);  
+            const text = rouletteLabels[i];  
+            ctx.fillText(text, -ctx.measureText(text).width / 2, 0);  
+            ctx.restore();  
+        }  
+
+        // 중심 캡 데코레이션 코어링  
+        ctx.fillStyle = "#6366F1";  
+        ctx.beginPath();  
+        ctx.arc(180, 180, insideRadius, 0, Math.PI * 2, false);  
+        ctx.fill();  
+    }  
+
+    function spinRouletteWheel() {  
+        document.getElementById('btn-spin').disabled = true;  
+        document.getElementById('roulette-winner-box').classList.add('hidden');  
+        spinAngleStart = Math.random() * 10 + 10;  
+        spinTime = 0;  
+        spinTimeTotal = Math.random() * 3 * 1000 + 4 * 1000;  
+        rotateWheel();  
+    }  
+
+    function rotateWheel() {  
+        spinTime += 30;  
+        if (spinTime >= spinTimeTotal) {  
+            stopRotateWheel();  
+            return;  
+        }  
+        const spinAngle = spinAngleStart - easeOut(spinTime, 0, spinAngleStart, spinTimeTotal);  
+        startAngle += (spinAngle * Math.PI / 180);  
+        drawRouletteWheel();  
+        spinTimeout = setTimeout(rotateWheel, 30);  
+    }  
+
+    function stopRotateWheel() {  
+        clearTimeout(spinTimeout);  
+        const degrees = startAngle * 180 / Math.PI + 90;  
+        const arcd = arc * 180 / Math.PI;  
+        const index = Math.floor((360 - (degrees % 360)) / arcd) % rouletteLabels.length;  
+          
+        const finalWinnerName = rouletteLabels[index];  
+        document.getElementById('roulette-winner-text').innerText = finalWinnerName;  
+        document.getElementById('roulette-winner-box').classList.remove('hidden');  
+        document.getElementById('btn-spin').disabled = false;  
+          
+        confetti({ particleCount: 80, spread: 50 });  
+    }  
+
+    function easeOut(t, b, c, d) {  
+        const ts = (t /= d) * t;  
+        const tc = ts * t;  
+        return b + c * (tc + -3 * ts + 3 * t);  
+    }  
+
+    // ================= 대포 연출 비즈니스 스크립트 엔진 =================  
+    function fireCannonEngine() {  
+        const btn = document.getElementById('btn-cannon-fire');  
+        const icon = document.getElementById('cannon-icon');  
+        const effect = document.getElementById('cannon-fire-effect');  
+        const popup = document.getElementById('cannon-result-popup');  
+
+        btn.disabled = true;  
+        popup.classList.add('hidden');  
+          
+        // 팅기는 진동 텐션 조준 모션 구현  
+        icon.style.transform = "scale(0.8) rotate(-15deg)";  
+          
+        setTimeout(() => {  
+            icon.style.transform = "scale(1.2) rotate(10deg)";  
+            effect.style.opacity = '1';  
+            effect.classList.add('animate-ping');  
+              
+            // 폭죽 발파 터뜨리기  
+            confetti({ particleCount: 120, angle: 60, spread: 55, origin: { x: 0 } });  
+            confetti({ particleCount: 120, angle: 120, spread: 55, origin: { x: 1 } });  
+
+            // 당첨 멤버 데이터 산출 적용  
+            const lucky = members[Math.floor(Math.random() * members.length)];  
+            document.getElementById('cannon-winner-img').src = lucky.image;  
+            document.getElementById('cannon-winner-name').innerText = lucky.name;  
+
+            setTimeout(() => {  
+                icon.style.transform = "none";  
+                effect.style.opacity = '0';  
+                effect.classList.remove('animate-ping');  
+                popup.classList.remove('hidden');  
+                btn.disabled = false;  
+            }, 400);  
+
+        }, 600);  
+    }  
+
+    // 제비뽑기 카드 뒤집기 매커니즘 트리거  
+    function flipDrawCard(cardElement, name, img) {  
+        if(!cardElement.classList.contains('flipped')) {  
+            cardElement.classList.add('flipped');  
+            confetti({ particleCount: 15, spread: 20 });  
+        }  
+    }  
+
+    // 순서 리스트 전체 일괄 오픈 오버라이드  
+    function revealAllOrderSequence() {  
+        const masks = document.querySelectorAll('.generic-hidden-mask');  
+        masks.forEach(m => m.classList.remove('blur-md'));  
+        const btns = document.querySelectorAll('.order-row-item button');  
+        btns.forEach(b => b.remove());  
+    }  
+
+
+    /* ====================================================================  
+       ③ 자리 배치 시스템 (학교 교실 대형 빌더 & 고속버스 대형 빌더)  
+       ==================================================================== */  
+    function startSeatArrangement(seatType) {  
+        showPage('page-result');  
+        document.getElementById('result-type-badge').innerText = `SEAT: ${seatType.toUpperCase()}`;  
+        const area = document.getElementById('result-display-area');  
+
+        let pool = [...members].sort(() => Math.random() - 0.5);  
+
+        if (seatType === 'school') {  
+            // [학교 배치: 6열 구조 고정형 템플릿 - (2열 - 복도 - 2열 - 복도 - 2열)]  
+            area.innerHTML = `  
+                <div class="glass w-full max-w-4xl mx-auto rounded-3xl p-6 border border-slate-800 space-y-8">  
+                    <div class="text-center space-y-1">  
+                        <div class="bg-slate-800 text-slate-400 max-w-xs mx-auto py-1.5 rounded-md text-xs font-black tracking-widest border border-slate-700 shadow">칠판 (BOARD)</div>  
+                        <h2 class="text-2xl font-black text-white pt-2"><i class="fa-solid fa-school text-amber-500"></i> 교실 자리 배치 구성표</h2>  
+                    </div>  
+                    <div id="school-classroom-grid" class="grid grid-cols-8 gap-x-2 gap-y-4 text-center items-center overflow-x-auto p-2 min-w-[600px]">  
+                        <!-- 스크립트로 내부 라인 슬롯 빌드 -->  
+                    </div>  
+                </div>  
+            `;  
+
+            const grid = document.getElementById('school-classroom-grid');  
+              
+            // 총 필요 행수 계산 (1줄당 실 배치 6인석 점유 기준 브레이킹)  
+            const totalRows = Math.ceil(pool.length / 6) < 3 ? 3 : Math.ceil(pool.length / 6);  
+            let poolIdx = 0;  
+
+            for (let r = 0; r < totalRows; r++) {  
+                for (let c = 0; c < 8; c++) {  
+                    // 복도 라인 체크 (인덱스 구조상 2번 열과 5번 열이 통로 통제 구역)  
+                    if (c === 2 || c === 5) {  
+                        const corridor = document.createElement('div');  
+                        corridor.className = "col-span-1 h-full flex items-center justify-center text-[11px] text-slate-600 font-bold tracking-tighter select-none pointer-events-none";  
+                        corridor.innerText = "복도";  
+                        grid.appendChild(corridor);  
+                    } else {  
+                        // 일반 책상 자리 빌드인  
+                        const desk = document.createElement('div');  
+                        if (poolIdx < pool.length) {  
+                            const m = pool[poolIdx];  
+                            desk.className = "col-span-1 bg-slate-900/90 border border-slate-800 p-1.5 rounded-xl flex flex-col items-center justify-center space-y-1 shadow shadow-indigo-950/40 animate-fade-in";  
+                            desk.innerHTML = `  
+                                <img src="${m.image}" class="w-11 h-11 rounded-lg object-cover bg-slate-800 shadow">  
+                                <span class="text-xs font-bold text-white truncate w-full block">${m.name}</span>  
+                            `;  
+                            poolIdx++;  
+                        } else {  
+                            // 공석 빈자리 패딩  
+                            desk.className = "col-span-1 border border-dashed border-slate-800 py-4 rounded-xl text-slate-700 text-[11px] font-medium flex items-center justify-center";  
+                            desk.innerText = "공석";  
+                        }  
+                        grid.appendChild(desk);  
+                    }  
+                }  
+            }  
+        }   
+        else if (seatType === 'bus') {  
+            // [버스 배치: 4열 구조 고정형 템플릿 - (2열 - 중앙 통로 - 2열)]  
+            area.innerHTML = `  
+                <div class="glass w-full max-w-xl mx-auto rounded-3xl p-5 border border-slate-800 space-y-6">  
+                    <div class="flex justify-between items-center bg-slate-950 px-4 py-2 rounded-xl border border-slate-800">  
+                        <span class="text-xs font-bold text-slate-400"><i class="fa-solid fa-steering-wheel text-indigo-400 mr-1"></i> 운전석</span>  
+                        <h2 class="text-base font-black text-white"><i class="fa-solid fa-bus text-indigo-500"></i> 투어 버스 좌석 배치도</h2>  
+                        <span class="text-xs font-bold text-slate-500">출입문</span>  
+                    </div>  
+                    <div id="bus-inner-grid" class="grid grid-cols-5 gap-x-2 gap-y-3 items-center overflow-x-auto p-1 min-w-[340px]">  
+                        <!-- 버스 시트 로딩 맵 기동 -->  
+                    </div>  
+                </div>  
+            `;  
+
+            const grid = document.getElementById('bus-inner-grid');  
+            const totalRows = Math.ceil(pool.length / 4) < 4 ? 4 : Math.ceil(pool.length / 4);  
+            let poolIdx = 0;  
+
+            for (let r = 0; r < totalRows; r++) {  
+                for (let c = 0; c < 5; c++) {  
+                    // 중앙 통로 필터 통제 (2번 인덱스 컬럼)  
+                    if (c === 2) {  
+                        const aisle = document.createElement('div');  
+                        aisle.className = "col-span-1 text-center text-[10px] text-slate-600 font-semibold tracking-widest uppercase select-none pointer-events-none";  
+                        aisle.innerText = "통로";  
+                        grid.appendChild(aisle);  
+                    } else {  
+                        const seat = document.createElement('div');  
+                        if (poolIdx < pool.length) {  
+                            const m = pool[poolIdx];  
+                            seat.className = "col-span-1 bg-slate-900/90 border border-slate-800/80 p-1.5 rounded-xl flex flex-col items-center justify-center space-y-1 relative shadow";  
+                            seat.innerHTML = `  
+                                <img src="${m.image}" class="w-10 h-10 rounded-md object-cover bg-slate-800">  
+                                <span class="text-[11px] font-bold text-slate-200 truncate w-full block text-center">${m.name}</span>  
+                            `;  
+                            poolIdx++;  
+                        } else {  
+                            seat.className = "col-span-1 border border-dashed border-slate-800/50 py-3 rounded-xl text-slate-700 text-[10px] flex items-center justify-center";  
+                            seat.innerText = "빈자리";  
+                        }  
+                        grid.appendChild(seat);  
+                    }  
+                }  
+            }  
+        }  
+        confetti({ particleCount: 30, spread: 40 });  
+    }  
+
+    // 초기 어플리케이션 가동 마운팅 바인딩  
+    window.onload = function() {  
+        renderMembers();  
+    };  
+</script>
+
+</body>  
+</html>  
